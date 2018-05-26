@@ -1,0 +1,6 @@
+*.swp
+*.tar.xz
+data/
+staging
+priv_testnet/
+arbiter-verbatim
