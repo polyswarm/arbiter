@@ -1,0 +1,41 @@
+version: '3'
+services:
+    arbiter:
+        image: "polyswarm/arbiter-verbatim"
+        depends_on:
+            - polyswarm
+        environment:
+            - POLYSWARM_HOST=polyswarm:31337
+    polyswarm:
+        image: "polyswarm/polyswarmd"
+        depends_on:
+            - ipfs
+            - geth
+        entrypoint:
+            - polyswarmd
+        environment:
+            - ETH_URI=http://geth:8545
+            - IPFS_URI=http://ipfs:5001
+        volumes_from:
+            - geth
+    geth:
+        image: "ethereum/client-go:alpine"
+        ports:
+            - "30303:30303"
+        volumes:
+            - "ethereum:/root/.ethereum"
+        command: ["--fast", "--rpc", "--rpcaddr", "0.0.0.0", "--rpcvhosts", "geth", "--rpcapi", "eth,web3,personal,net"]
+    ipfs:
+        image: "ipfs/go-ipfs"
+        environment:
+            - IPFS_BIND_IP=0.0.0.0
+            - IPFS_BOOTSTRAP_RM_ALL=true
+        ports:
+            - "4001:4001"
+        volumes:
+            - "ipfs-export:/export"
+            - "ipfs-data:/data/ipfs"
+volumes:
+    ethereum:
+    ipfs-export:
+    ipfs-data:
