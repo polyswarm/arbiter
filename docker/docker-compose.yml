@@ -20,6 +20,7 @@ services:
                 - IPFS_URI=http://ipfs:5001
                 - POLYSWARMD_NETWORK=docker
             ports:
+                - "31337:31337"
         ipfs:
             image: "ipfs/go-ipfs"
             environment:
