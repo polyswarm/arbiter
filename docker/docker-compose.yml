@@ -5,8 +5,8 @@ services:
         depends_on:
             - polyswarm
             - arbiter
-                    environment:
-                - AMBASSADOR_HOST=ambassador:342
+                environment:
+                - ARBITER_HOST=arbiter:342
                 - POLYSWARM_HOST=polyswarm:31337
      polyswarmd:
             image: "polyswarm/polyswarmd"
