@@ -8,7 +8,7 @@ before_script:
 
 build-master:
   stage: build
-    variables:
+  variables:
         DOCKER_FULL_PATH: index.docker.io/polyswarm/arbiter-verbatim
 
   script:
