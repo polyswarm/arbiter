@@ -282,7 +282,7 @@ def setAccount():
 
 	#A bit hardcoded
 	# Might want to change to looking at keystore or unlocking out of module
-	return accountList['result'][0]
+	return accountList['result'][3]
 
 if __name__ == "__main__":
 
