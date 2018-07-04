@@ -6,13 +6,12 @@ from heapq import heappush, heappop
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 
-keyfile = './key/keyfile'
-truthcsv = './artifacts/truth.csv'
-password = 'password'
+keyfile = "./key/keyfile"
+truthcsv = "./artifacts/truth.csv"
+password = "password"
 
 polyswarmd = os.environ.get("POLYSWARMD")
 geth = os.environ.get("GETH")
-
 
 w3 = Web3(HTTPProvider(geth))
 w3.middleware_stack.inject(geth_poa_middleware, layer=0)
@@ -29,7 +28,7 @@ def get_artifacts(uri):
 # Finds the file in the truth table. Returns a boolean or None.
 def find_value_in_truth_table(filehash):
     with open(truthcsv, newline='') as ground_truth:
-        reader = csv.reader(ground_truth, delimeter=',')
+        reader = csv.reader(ground_truth, delimeter=",")
         for row in reader:
             if row[0] == filehash:
                 return row[1] == 1
@@ -40,11 +39,11 @@ def settle_bounties(heap, blocknumber):
     while len(heap) > 0:
         head = heap[0]
 
-        # request settle
+        #  For any bounties blocknumber exceeds the reveal & vote windows... settle
         if int(head[0]) < blocknumber:
             guid = head[1]
             response = requests.post( polyswarmd + "/bounties/" + guid + "/settle" )
-            transactions = response.json()['result']['transactions']
+            transactions = response.json()["result"]["transactions"]
             response = sign_transactions(transactions)
 
             if response.json()["status"] == "OK":
@@ -56,24 +55,19 @@ def settle_bounties(heap, blocknumber):
             break
 
 def vote(guid, verdicts):
-    data = {
-        "verdicts": verdicts,
-        "valid_bloom": True
-    }
-    response = requests.post( polyswarmd + "/bounties/" + guid + "/vote", data = data )
-    transactions = response.json()['result']['transactions']
+    response = requests.post( polyswarmd + "/bounties/" + guid + "/vote", json={"verdicts": verdicts, "valid_bloom": True} )
+    transactions = response.json()["result"]["transactions"]
     response = sign_transactions(transactions)
     return response.json()["status"] == "OK"
 
 def sign_transactions(transactions):
     signed_transactions = []
-    key = w3.eth.account.decrypt(open(keyfile,'r').read(), password)
+    key = w3.eth.account.decrypt(open(keyfile,"r").read(), password)
     for transaction in transactions:
         signed = w3.eth.account.signTransaction(transaction, key)
-        raw = bytes(signed['rawTransaction']).hex()
+        raw = bytes(signed["rawTransaction"]).hex()
         signed_transactions.append(raw)
-    return requests.post('http://polyswarmd:31337/transactions', json={'transactions': signed_transactions})
-
+    return requests.post( polyswarmd + "/transactions", json={"transactions": signed_transactions} )
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
 def listen_and_arbitrate():
