@@ -1,20 +1,34 @@
 import requests
 import os
 import csv
+import glob
 
 from heapq import heappush, heappop
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
 
-keyfile = "./key/keyfile"
+keydir = "./keystore"
 truthcsv = "./artifacts/truth.csv"
-password = "password"
 
 polyswarmd = os.environ.get("POLYSWARMD")
 geth = os.environ.get("GETH")
+address = os.environ.get("ADDRESS")
+password = os.environ.get("PASSWORD")
 
 w3 = Web3(HTTPProvider(geth))
 w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+
+def decrypt_key(address, password):
+    os.chdir(keydir)
+    if address.starts_with('0x'):
+        temp = address[2:]
+    possible_matches = glob.glob("*" + temp)
+    os.chdir('..')
+    if len(possible_matches) == 1:
+        with open(possible_matches[0]) as keyfile:
+            encrypted = keyfile.read()
+            return w3.decrypt_key(encrypted, password)
+    return None
 
 # Get the file hash from ipfs
 def get_artifacts(uri):
@@ -62,7 +76,7 @@ def vote(guid, verdicts):
 
 def sign_transactions(transactions):
     signed_transactions = []
-    key = w3.eth.account.decrypt(open(keyfile,"r").read(), password)
+    key = decrypt_key(address, password)
     for transaction in transactions:
         signed = w3.eth.account.signTransaction(transaction, key)
         raw = bytes(signed["rawTransaction"]).hex()
@@ -90,7 +104,7 @@ def listen_and_arbitrate():
                     if vote(bounty["guid"], verdicts):
                         # Mark voted
                         voted_bounties.add(bounty["guid"])
-                        # Add to head so it can be settled
+                        # Add to heap so it can be settled
                         heappush(to_settle, (int(bounty["blocknumber"])+50, bounty["guid"]))
 
             blocknumber = w3.eth.blockNumber
