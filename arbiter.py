@@ -52,7 +52,7 @@ def settle_bounties(heap, blocknumber):
                 heappop(heap)
                 settled.append(guid)
             else:
-                print("Failed to settle " + guid)
+                sys.exit(13)
                 break
         else:
             break
@@ -96,6 +96,10 @@ def listen_and_arbitrate(backend):
                             voted_bounties.add(bounty["guid"])
                             # Add to heap so it can be settled
                             heappush(to_settle, (int(bounty["expiration"])+50, bounty["guid"]))
+                        else:
+                            sys.exit(11)
+                    else:
+                        sys.exit(12)
 
             blocknumber = w3.eth.blockNumber
             settled = settle_bounties(to_settle, blocknumber)
