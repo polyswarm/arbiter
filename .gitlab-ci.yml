@@ -1,23 +1,23 @@
-image: docker:latest
+image: docker:stable
 
 services:
   - docker:dind
 
-build-master:
-  stage: build
-  variables:
-        DOCKER_FULL_PATH: index.docker.io/polyswarm/arbiter-verbatim
+before_script:
+  - apk --no-cache add curl
 
-  script:
-        - docker build -t $DOCKER_FULL_PATH -f docker/Dockerfile .
-        - docker login -u "$CI_CUSTOM_DOCKER_HUB_USERNAME" -p "C$I_CUSTOM_DOCKER_HUB_PASSWORD" $CI_CUSTOM_DOCKER_HUB_URI && docker push $DOCKER_FULL_PATH
-  only:
-    - master
-
-build-non-master:
-  stage: build
-  script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-    - docker build --pull -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" .
-  except:
-    - master
+build-docker:
+    tags:
+        - docker
+    stage: test
+    script: 
+        - docker build -t ${CI_PROJECT_PATH} -f docker/Dockerfile .
+        
+kick-e2e:
+    only: 
+        - master
+    tags:
+        - docker
+    stage: deploy
+    script:
+       - curl --request POST --form "token=$CI_JOB_TOKEN" --form ref=master https://gitlab.polyswarm.io/api/v4/projects/${CI_CUSTOM_PROJECT_ID_META}/trigger/pipeline
