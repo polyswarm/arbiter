@@ -1,18 +1,18 @@
 
 import sqlite3
 import hashlib
+import requests
 
-def scan(self, host, artifactUri):
+def scan(host, uri):
     conn = sqlite3.connect('../artifacts/truth.db')
-    artifacts = get_artifacts(host, artifactUri)
+    artifacts = get_artifacts(host, uri)
     hashes = [hash_file(host, uri, i) for i, v in enumerate(artifacts)]
     verdicts = [find_truth(conn, h) for i, h in enumerate(hashes)]
-    list(map(find_truth, hashes))
     conn.close()
     return verdicts
 
 def hash_file(host, uri, index):
-    response = requests.get(host + "/artifacts/" + uri + "/" + index)
+    response = requests.get(host + "/artifacts/" + uri + "/" + str(index))
     content = response.content
     return hashlib.sha256(content).hexdigest()
 
@@ -29,5 +29,5 @@ def find_truth(conn, filehash):
     h = (filehash,)
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM files WHERE name=?', h)
-    row = c.fetchone()
-    return row["malicious"] == 1
+    row = cursor.fetchone()
+    return row is not None and row[1] == 1

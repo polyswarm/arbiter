@@ -60,6 +60,7 @@ def settle_bounties(heap, blocknumber):
 
 def vote(guid, verdicts):
     response = requests.post(polyswarmd + "/bounties/" + guid + "/vote?account=" + address + "&chain=" + chain, json={"verdicts": verdicts, "valid_bloom": True})
+
     transactions = response.json()["result"]["transactions"]
     response = sign_transactions(transactions)
     return response.json()["status"] == "OK"
@@ -87,7 +88,7 @@ def listen_and_arbitrate(backend):
             for bounty in bounties:
                 if bounty["guid"] not in voted_bounties:
                     # Vote
-                    verdicts = backend.scan(bounty["uri"])
+                    verdicts = backend.scan(polyswarmd, bounty["uri"])
                     if verdicts:
                         # If successfully volted, add to heap to be settled
                         if vote(bounty["guid"], verdicts):
