@@ -1,7 +1,6 @@
 from python:3
 
-#ADD /bounties /bounties 
 add /requirements.txt /requirements.txt
 run pip install -r requirements.txt
 add . .
-CMD ["python3","mainpython.py"]
+CMD ["python3", "arbiter.py", "--backend", "verbatim"]
