@@ -4,3 +4,4 @@ data/
 staging
 priv_testnet/
 arbiter-verbatim
+__pycache__/
