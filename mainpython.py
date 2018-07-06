@@ -2,7 +2,7 @@ import os
 import csv
 import glob
 from heapq import heappush, heappop
-
+import time
 import requests
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
@@ -14,18 +14,21 @@ polyswarmd = os.environ.get("POLYSWARMD")
 geth = os.environ.get("GETH")
 address = os.environ.get("ADDRESS")
 password = os.environ.get("PASSWORD")
+chain = os.environ.get("CHAIN")
 
 w3 = Web3(HTTPProvider(geth))
 w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
 def decrypt_key(addr, secret):
     os.chdir(KEYDIR)
-    if addr.starts_with('0x'):
+    if addr.startswith('0x'):
         temp = addr[2:]
+    else:
+        temp = addr
     possible_matches = glob.glob("*" + temp)
     os.chdir('..')
     if len(possible_matches) == 1:
-        with open(possible_matches[0]) as keyfile:
+        with open(KEYDIR + "/" + possible_matches[0]) as keyfile:
             encrypted = keyfile.read()
             return w3.eth.account.decrypt(encrypted, secret)
     return None
@@ -41,7 +44,7 @@ def get_artifacts(uri):
 # Finds the file in the truth table. Returns a boolean or None.
 def find_value_in_truth_table(filehash):
     with open(TRUTHCSV, newline='') as ground_truth:
-        reader = csv.reader(ground_truth, delimeter=",")
+        reader = csv.reader(ground_truth, delimiter=",")
         for row in reader:
             if row[0] == filehash:
                 return row[1] == 1
@@ -55,7 +58,7 @@ def settle_bounties(heap, blocknumber):
         #  For any bounties blocknumber exceeds the reveal & vote windows... settle
         if int(head[0]) < blocknumber:
             guid = head[1]
-            response = requests.post(polyswarmd + "/bounties/" + guid + "/settle")
+            response = requests.post(polyswarmd + "/bounties/" + guid + "/settle?account=" + address + "&chain=" + chain)
             transactions = response.json()["result"]["transactions"]
             response = sign_transactions(transactions)
 
@@ -68,7 +71,7 @@ def settle_bounties(heap, blocknumber):
             break
 
 def vote(guid, verdicts):
-    response = requests.post(polyswarmd + "/bounties/" + guid + "/vote", json={"verdicts": verdicts, "valid_bloom": True})
+    response = requests.post(polyswarmd + "/bounties/" + guid + "/vote?account=" + address + "&chain=" + chain, json={"verdicts": verdicts, "valid_bloom": True})
     transactions = response.json()["result"]["transactions"]
     response = sign_transactions(transactions)
     return response.json()["status"] == "OK"
@@ -89,25 +92,25 @@ def listen_and_arbitrate():
     voted_bounties = set()
     while True:
         # Check bounties route
-        # TODO chain in env
-        response = requests.get(polyswarmd + "/bounties/pending")
+        response = requests.get(polyswarmd + "/bounties/pending?chain=" + chain)
         decoded = response.json()
         if decoded["status"] == "OK":
             bounties = response.json()["result"]
             for bounty in bounties:
                 if bounty["guid"] not in voted_bounties:
                     # Vote
-                    hashes = get_artifacts(bounty["artifactUri"])
+                    hashes = get_artifacts(bounty["uri"])
                     verdicts = list(map(find_value_in_truth_table, hashes))
                     # If successfully volted, add to heap to be settled
                     if vote(bounty["guid"], verdicts):
                         # Mark voted
                         voted_bounties.add(bounty["guid"])
                         # Add to heap so it can be settled
-                        heappush(to_settle, (int(bounty["blocknumber"])+50, bounty["guid"]))
+                        heappush(to_settle, (int(bounty["expiration"])+50, bounty["guid"]))
 
             blocknumber = w3.eth.blockNumber
             settle_bounties(to_settle, blocknumber)
+        time.sleep(1000)
 
 if __name__ == "__main__":
     listen_and_arbitrate()
