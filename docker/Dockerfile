@@ -1,6 +1,6 @@
-from python:3
+FROM python:3
 
-add /requirements.txt /requirements.txt
-run pip install -r requirements.txt
-add . .
+ADD /requirements.txt /requirements.txt
+RUN pip install -r requirements.txt
+ADD . .
 CMD ["python3", "arbiter.py", "--backend", "verbatim"]
