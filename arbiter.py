@@ -4,6 +4,7 @@ import glob
 import sys
 import argparse
 import time
+import importlib
 from heapq import heappush, heappop
 import requests
 from web3 import Web3, HTTPProvider
