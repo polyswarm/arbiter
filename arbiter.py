@@ -1,5 +1,4 @@
 import os
-import csv
 import glob
 import sys
 import argparse
@@ -107,7 +106,7 @@ def listen_and_arbitrate(backend):
                 voted_bounties.remove(b)
         time.sleep(1000)
 
-if __name__ == "__main__":
+def main():
     sys.path.append('./backends')
     parser = argparse.ArgumentParser(description="Run an arbiter backend.")
 
@@ -116,3 +115,6 @@ if __name__ == "__main__":
 
     backend = importlib.import_module(args.backend)
     listen_and_arbitrate(backend)
+
+if __name__ == "__main__":
+    main()
