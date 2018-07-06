@@ -2,14 +2,16 @@
 import sqlite3
 import hashlib
 
-conn = sqlite3.connect('../artifacts/truth.db')
-
 def scan(self, host, artifactUri):
+    conn = sqlite3.connect('../artifacts/truth.db')
     artifacts = get_artifacts(host, artifactUri)
-    hashes = [hash(host, uri, i) for i, v in enumerate(artifacts)]
-    return list(map(find_truth, hashes))
+    hashes = [hash_file(host, uri, i) for i, v in enumerate(artifacts)]
+    verdicts = [find_truth(conn, h) for i, h in enumerate(hashes)]
+    list(map(find_truth, hashes))
+    conn.close()
+    return verdicts
 
-def hash(host, uri, index):
+def hash_file(host, uri, index):
     response = requests.get(host + "/artifacts/" + uri + "/" + index)
     content = response.content
     return hashlib.sha256(content).hexdigest()
@@ -23,7 +25,7 @@ def get_artifacts(host, uri):
     return list()
 
     # Finds the file in the truth table. Returns a boolean or None.
-def find_truth(filehash):
+def find_truth(conn, filehash):
     h = (filehash,)
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM files WHERE name=?', h)
