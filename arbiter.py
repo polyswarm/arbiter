@@ -74,7 +74,7 @@ def sign_transactions(transactions):
     return requests.post(polyswarmd + "/transactions", json={"transactions": signed_transactions})
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
-def listen_and_arbitrate(backend):
+def listen_and_arbitrate(test, backend):
     # to_settle is a head of bounty objects ordered by block number when then assertion reveal phase ends
     to_settle = []
     voted_bounties = set()
@@ -106,6 +106,9 @@ def listen_and_arbitrate(backend):
             settled = settle_bounties(to_settle, blocknumber)
             for b in settled:
                 voted_bounties.remove(b)
+            if settled and test:
+                print("Test exited when some bounties were settled")
+                sys.exit(0)
         time.sleep(1)
 
 def main():
@@ -113,10 +116,11 @@ def main():
     parser = argparse.ArgumentParser(description="Run an arbiter backend.")
 
     parser.add_argument("--backend", help="Select the backend", default="verbatim")
+    parser.add_argument("--test", help="Exits on successful settle", action="store_true",)
     args = parser.parse_args()
 
     backend = importlib.import_module(args.backend)
-    listen_and_arbitrate(backend)
+    listen_and_arbitrate(args.test, backend)
 
 if __name__ == "__main__":
     main()
