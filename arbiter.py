@@ -11,7 +11,7 @@ from web3.middleware import geth_poa_middleware
 
 KEYDIR = "./keystore"
 
-polyswarmd = os.environ.get("POLYSWARMD")
+polyswarmd = os.environ.get("POLYSWARM_HOST")
 geth = os.environ.get("GETH")
 address = os.environ.get("ADDRESS")
 password = os.environ.get("PASSWORD")
