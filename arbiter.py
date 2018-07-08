@@ -51,8 +51,8 @@ def settle_bounties(heap, blocknumber):
                 heappop(heap)
                 settled.append(guid)
             else:
+                print("Failed to settle bounty.")
                 sys.exit(13)
-                break
         else:
             break
     return settled
@@ -96,15 +96,17 @@ def listen_and_arbitrate(backend):
                             # Add to heap so it can be settled
                             heappush(to_settle, (int(bounty["expiration"])+50, bounty["guid"]))
                         else:
+                            print("Failed to submit vote.")
                             sys.exit(11)
                     else:
+                        print("Failed to retrieve files from IPFS.")
                         sys.exit(12)
 
             blocknumber = w3.eth.blockNumber
             settled = settle_bounties(to_settle, blocknumber)
             for b in settled:
                 voted_bounties.remove(b)
-        time.sleep(1000)
+        time.sleep(1)
 
 def main():
     sys.path.append('./backends')
