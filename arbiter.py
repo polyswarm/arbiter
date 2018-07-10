@@ -21,14 +21,13 @@ w3 = Web3(HTTPProvider(geth))
 w3.middleware_stack.inject(geth_poa_middleware, layer=0)
 
 def decrypt_key(addr, secret):
-    orig = os.getcwd()
     os.chdir(KEYDIR)
     if addr.startswith('0x'):
         temp = addr[2:]
     else:
         temp = addr
     possible_matches = glob.glob("*" + temp)
-    os.chdir(orig)
+    os.chdir('..')
     if len(possible_matches) == 1:
         with open(KEYDIR + "/" + possible_matches[0]) as keyfile:
             encrypted = keyfile.read()
@@ -90,16 +89,21 @@ def listen_and_arbitrate(test, backend):
             bounties = response.json()["result"]
             for bounty in bounties:
                 if bounty["guid"] not in voted_bounties:
+                    # Vote
                     verdicts = backend.scan(polyswarmd, bounty["uri"])
                     if verdicts:
+                        # If successfully volted, add to heap to be settled
                         if vote(bounty["guid"], verdicts):
                             # Mark voted
                             voted_bounties.add(bounty["guid"])
-                            # If successfully voted, add to heap to be settled
-                            heappush(to_settle, (int(bounty["expiration"]) + 50, bounty["guid"]))
+                            # Add to heap so it can be settled
+                            heappush(to_settle, (int(bounty["expiration"])+50, bounty["guid"]))
                         else:
                             print("Failed to submit vote.")
                             sys.exit(11)
+                    else:
+                        print("Failed to retrieve files from IPFS.")
+                        sys.exit(12)
 
             blocknumber = w3.eth.blockNumber
             settled = settle_bounties(to_settle, blocknumber)
