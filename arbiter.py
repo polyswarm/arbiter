@@ -75,6 +75,9 @@ def sign_transactions(transactions):
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
 def listen_and_arbitrate(test, backend):
+    if not stake():
+        print("Failed to Stake Arbiter.")
+        sys.exit(14)
     # to_settle is a head of bounty objects ordered by block number when then assertion reveal phase ends
     to_settle = []
     voted_bounties = set()
@@ -113,17 +116,18 @@ def listen_and_arbitrate(test, backend):
 
 def stake():
     minimumStake = 10000000000000000000000000
-    response = requests.get(polyswarmd + "/staking/total?address=" + address + "chain=" + chain)
-    currentStake = int(response)
-    if minimumStake > currentStake:
-        body = {
-            amount: str(minimumStake - currentStake)
-        }
-        response = requests.post(polyswarmd + "/staking/deposit?account=" + address + "&chain=" + chain, json=body)
-        transactions = response.json()["result"]["transactions"]
-        response = sign_transactions(transactions)
-        return response.json()["status"] == "OK"
-    return true
+    response = requests.get(polyswarmd + "/balances/" + address + "/staking/total?chain=" + chain)
+    if response.json()["status"] != "OK":
+        return False
+
+    currentStake = int(response.json()["result"])
+    if minimumStake <= currentStake:
+        return True
+
+    response = requests.post(polyswarmd + "/staking/deposit?account=" + address + "&chain=" + chain, json={"amount": str(minimumStake - currentStake)})
+    transactions = response.json()["result"]["transactions"]
+    response = sign_transactions(transactions)
+    return response.json()["status"] == "OK"
 
 def main():
     sys.path.append('./backends')
@@ -133,12 +137,8 @@ def main():
     parser.add_argument("--test", help="Exits on successful settle", action="store_true",)
     args = parser.parse_args()
 
-    if stake():
-        backend = importlib.import_module(args.backend)
-        listen_and_arbitrate(args.test, backend)
-    else:
-        print("Failed to Stake Arbiter.")
-        sys.exit(14)
+    backend = importlib.import_module(args.backend)
+    listen_and_arbitrate(args.test, backend)
 
 if __name__ == "__main__":
     main()
