@@ -2,19 +2,19 @@
 
 This project hosts a means to run an arbiter easily.
 
-# Run an Arbiter
+## Run an Arbiter
 
 `python arbiter.py --backends <name of backend module>`
 
 The default backend is `verbatim` if no backend is set.
 
-# Adding an arbiter backend
+## Adding an arbiter backend
 
 All backends must be their own python module inside the `backends/` directory. The name of the file will be the name used to load the backend.
 
-At a minimum, it must have a `scan(uri)` function that returns an array of boolean verdicts.
+At a minimum, it must have a `scan(host, uri)` function that returns an array of boolean verdicts.
 
-# Error codes
+## Error codes
 
 There are three major events that cause errors
 
