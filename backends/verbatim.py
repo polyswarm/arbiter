@@ -2,13 +2,18 @@
 import sqlite3
 import hashlib
 import requests
+import sys
 
 def scan(host, uri):
     conn = sqlite3.connect('../artifacts/truth.db')
     artifacts = get_artifacts(host, uri)
     hashes = [hash_file(host, uri, i) for i, v in enumerate(artifacts)]
-    verdicts = [find_truth(conn, h) for i, h in enumerate(hashes)]
+    verdicts = [find_truth(conn, h) for h in hashes]
     conn.close()
+
+    for v in verdicts:
+        if v is None:
+            return None
     return verdicts
 
 def hash_file(host, uri, index):
@@ -22,7 +27,8 @@ def get_artifacts(host, uri):
     decoded = response.json()
     if decoded["status"] == "OK":
         return decoded["result"]
-    return list()
+    print("Failed to retrieve files from IPFS.")
+    sys.exit(12)
 
     # Finds the file in the truth table. Returns a boolean or None.
 def find_truth(conn, filehash):
@@ -30,4 +36,7 @@ def find_truth(conn, filehash):
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM files WHERE name=?', h)
     row = cursor.fetchone()
-    return row is not None and row[1] == 1
+    # Don't vote on files not in our database
+    if row is None:
+        return None
+    return row[1] == 1
