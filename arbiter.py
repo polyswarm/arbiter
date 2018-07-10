@@ -111,6 +111,20 @@ def listen_and_arbitrate(test, backend):
                 sys.exit(0)
         time.sleep(1)
 
+def stake():
+    minimumStake = 10000000000000000000000000
+    response = requests.get(polyswarmd + "/staking/total?address=" + address + "chain=" + chain)
+    currentStake = int(response)
+    if minimumStake > currentStake:
+        body = {
+            amount: str(minimumStake - currentStake)
+        }
+        response = requests.post(polyswarmd + "/staking/deposit?account=" + address + "&chain=" + chain, json=body)
+        transactions = response.json()["result"]["transactions"]
+        response = sign_transactions(transactions)
+        return response.json()["status"] == "OK"
+    return true
+
 def main():
     sys.path.append('./backends')
     parser = argparse.ArgumentParser(description="Run an arbiter backend.")
@@ -119,8 +133,12 @@ def main():
     parser.add_argument("--test", help="Exits on successful settle", action="store_true",)
     args = parser.parse_args()
 
-    backend = importlib.import_module(args.backend)
-    listen_and_arbitrate(args.test, backend)
+    if stake():
+        backend = importlib.import_module(args.backend)
+        listen_and_arbitrate(args.test, backend)
+    else:
+        print("Failed to Stake Arbiter.")
+        sys.exit(14)
 
 if __name__ == "__main__":
     main()
