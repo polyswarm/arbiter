@@ -47,7 +47,7 @@ def settle_bounties(heap, blocknumber):
             transactions = response.json()["result"]["transactions"]
             response = sign_transactions(transactions)
 
-            if response.json()["status"] == "OK":
+            if "errors" not in response.json()["result"]:
                 heappop(heap)
                 settled.append(guid)
             else:
@@ -62,7 +62,7 @@ def vote(guid, verdicts):
 
     transactions = response.json()["result"]["transactions"]
     response = sign_transactions(transactions)
-    return response.json()["status"] == "OK"
+    return "errors" not in response.json()["result"]
 
 def sign_transactions(transactions):
     signed_transactions = []
