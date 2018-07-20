@@ -5,6 +5,7 @@ import argparse
 import time
 import importlib
 from heapq import heappush, heappop
+from uuid import UUID
 import requests
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
@@ -19,6 +20,17 @@ chain = os.environ.get("CHAIN")
 
 w3 = Web3(HTTPProvider(geth))
 w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+
+def check_uuid(uuid):
+    # Check that the uuid i pass is valid.
+    try:
+        converted = UUID(uuid, version=4)
+    except ValueError:
+        return False
+    return str(converted) == uuid
+
+def check_address(address):
+    return w3.isAddress(address)
 
 def decrypt_key(addr, secret):
     os.chdir(KEYDIR)
@@ -51,9 +63,7 @@ def settle_bounties(session, isTest, heap, blocknumber):
                 heappop(heap)
                 settled.append(guid)
             else:
-                print("Failed to settle bounty.")
-                if isTest:
-                    sys.exit(13)
+                print_error(isTest, "Failed to settle bounty.", 13)
         else:
             break
     return settled
@@ -78,8 +88,8 @@ def sign_transactions(session, transactions):
 def listen_and_arbitrate(isTest, backend):
     session = requests.Session()
     if not stake(session):
-        print("Failed to Stake Arbiter.")
-        sys.exit(14)
+        # Always exit, because it is unusable without staking
+        print_error(True, "Failed to Stake Arbiter.", 9)
     # to_settle is a head of bounty objects ordered by block number when then assertion reveal phase ends
     to_settle = []
     voted_bounties = set()
@@ -91,6 +101,9 @@ def listen_and_arbitrate(isTest, backend):
             bounties = response.json()["result"]
             for bounty in bounties:
                 if bounty["guid"] not in voted_bounties:
+                    if not check_uuid(bounty["guid"]):
+                        print_error(isTest, "Bad GUID: %s" % bounty["guid"], 10)
+                        continue
                     # Vote
                     verdicts = backend.scan(polyswarmd, bounty["uri"])
                     if verdicts:
@@ -101,21 +114,16 @@ def listen_and_arbitrate(isTest, backend):
                             # Add to heap so it can be settled
                             heappush(to_settle, (int(bounty["expiration"])+50, bounty["guid"]))
                         else:
-                            print("Failed to submit vote.")
-                            if isTest:
-                                sys.exit(11)
+                            print_error(isTest, "Failed to submit vote.", 11)
                     else:
-                        print("Failed to retrieve files from IPFS.")
-                        if isTest:
-                            sys.exit(12)
+                        print_error(isTest, "Failed to retrieve files from IPFS.", 12)
 
             blocknumber = w3.eth.blockNumber
             settled = settle_bounties(session, isTest, to_settle, blocknumber)
             for b in settled:
                 voted_bounties.remove(b)
             if settled and isTest:
-                print("Test exited when some bounties were settled")
-                sys.exit(0)
+                print_error(True, "Test exited when some bounties were settled", 0)
         time.sleep(1)
 
 def stake(session):
@@ -133,6 +141,11 @@ def stake(session):
     response = sign_transactions(session, transactions)
     return response.json()["status"] == "OK"
 
+def print_error(test, message, code):
+    print(message)
+    if test:
+        sys.exit(code)
+
 def main():
     sys.path.append('./backends')
     parser = argparse.ArgumentParser(description="Run an arbiter backend.")
@@ -142,6 +155,9 @@ def main():
     args = parser.parse_args()
 
     backend = importlib.import_module(args.backend)
+    if not check_address(address):
+        # Always exit. Unusable with a bad address
+        print_error(True, "Invalid address %s" % address, 8)
     listen_and_arbitrate(args.test, backend)
 
 if __name__ == "__main__":
