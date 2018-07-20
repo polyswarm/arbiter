@@ -35,7 +35,7 @@ def decrypt_key(addr, secret):
     return None
 
 # This will settle any bounties
-def settle_bounties(isTest, heap, blocknumber):
+def settle_bounties(session, isTest, heap, blocknumber):
     settled = []
     while heap:
         head = heap[0]
@@ -43,9 +43,9 @@ def settle_bounties(isTest, heap, blocknumber):
         #  For any bounties blocknumber exceeds the reveal & vote windows... settle
         if int(head[0]) < blocknumber:
             guid = head[1]
-            response = requests.post(polyswarmd + "/bounties/" + guid + "/settle", params={"account": address, "chain": chain})
+            response = session.post(polyswarmd + "/bounties/" + guid + "/settle", params={"account": address, "chain": chain})
             transactions = response.json()["result"]["transactions"]
-            response = sign_transactions(transactions)
+            response = sign_transactions(session, transactions)
 
             if "errors" not in response.json()["result"]:
                 heappop(heap)
@@ -58,25 +58,26 @@ def settle_bounties(isTest, heap, blocknumber):
             break
     return settled
 
-def vote(guid, verdicts):
-    response = requests.post(polyswarmd + "/bounties/" + guid + "/vote", params={"account": address, "chain": chain}, json={"verdicts": verdicts, "valid_bloom": True})
+def vote(session, guid, verdicts):
+    response = session.post(polyswarmd + "/bounties/" + guid + "/vote", params={"account": address, "chain": chain}, json={"verdicts": verdicts, "valid_bloom": True})
 
     transactions = response.json()["result"]["transactions"]
-    response = sign_transactions(transactions)
+    response = sign_transactions(session, transactions)
     return "errors" not in response.json()["result"]
 
-def sign_transactions(transactions):
+def sign_transactions(session, transactions):
     signed_transactions = []
     key = decrypt_key(address, password)
     for transaction in transactions:
         signed = w3.eth.account.signTransaction(transaction, key)
         raw = bytes(signed["rawTransaction"]).hex()
         signed_transactions.append(raw)
-    return requests.post(polyswarmd + "/transactions", json={"transactions": signed_transactions})
+    return session.post(polyswarmd + "/transactions", json={"transactions": signed_transactions})
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
 def listen_and_arbitrate(isTest, backend):
-    if not stake():
+    session = requests.Session()
+    if not stake(session):
         print("Failed to Stake Arbiter.")
         sys.exit(14)
     # to_settle is a head of bounty objects ordered by block number when then assertion reveal phase ends
@@ -84,7 +85,7 @@ def listen_and_arbitrate(isTest, backend):
     voted_bounties = set()
     while True:
         # Check bounties route
-        response = requests.get(polyswarmd + "/bounties/pending", params={"chain": chain})
+        response = session.get(polyswarmd + "/bounties/pending", params={"chain": chain})
         decoded = response.json()
         if decoded["status"] == "OK":
             bounties = response.json()["result"]
@@ -94,7 +95,7 @@ def listen_and_arbitrate(isTest, backend):
                     verdicts = backend.scan(polyswarmd, bounty["uri"])
                     if verdicts:
                         # If successfully volted, add to heap to be settled
-                        if vote(bounty["guid"], verdicts):
+                        if vote(session, bounty["guid"], verdicts):
                             # Mark voted
                             voted_bounties.add(bounty["guid"])
                             # Add to heap so it can be settled
@@ -109,7 +110,7 @@ def listen_and_arbitrate(isTest, backend):
                             sys.exit(12)
 
             blocknumber = w3.eth.blockNumber
-            settled = settle_bounties(isTest, to_settle, blocknumber)
+            settled = settle_bounties(session, isTest, to_settle, blocknumber)
             for b in settled:
                 voted_bounties.remove(b)
             if settled and isTest:
@@ -117,9 +118,9 @@ def listen_and_arbitrate(isTest, backend):
                 sys.exit(0)
         time.sleep(1)
 
-def stake():
+def stake(session):
     minimumStake = 10000000000000000000000000
-    response = requests.get(polyswarmd + "/balances/" + address + "/staking/total", params={"chain": chain})
+    response = session.get(polyswarmd + "/balances/" + address + "/staking/total", params={"chain": chain})
     if response.json()["status"] != "OK":
         return False
 
@@ -127,9 +128,9 @@ def stake():
     if minimumStake <= currentStake:
         return True
 
-    response = requests.post(polyswarmd + "/staking/deposit", params={"account": address, "chain": chain}, json={"amount": str(minimumStake - currentStake)})
+    response = session.post(polyswarmd + "/staking/deposit", params={"account": address, "chain": chain}, json={"amount": str(minimumStake - currentStake)})
     transactions = response.json()["result"]["transactions"]
-    response = sign_transactions(transactions)
+    response = sign_transactions(session, transactions)
     return response.json()["status"] == "OK"
 
 def main():
