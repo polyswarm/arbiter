@@ -4,21 +4,22 @@ import hashlib
 import requests
 
 def scan(host, uri):
+    session = requests.Session()
     conn = sqlite3.connect('../artifacts/truth.db')
-    artifacts = get_artifacts(host, uri)
-    hashes = [hash_file(host, uri, i) for i, v in enumerate(artifacts)]
+    artifacts = get_artifacts(session, host, uri)
+    hashes = [hash_file(session, host, uri, i) for i, v in enumerate(artifacts)]
     verdicts = [find_truth(conn, h) for i, h in enumerate(hashes)]
     conn.close()
     return verdicts
 
-def hash_file(host, uri, index):
-    response = requests.get(host + "/artifacts/" + uri + "/" + str(index))
+def hash_file(session, host, uri, index):
+    response = session.get(host + "/artifacts/" + uri + "/" + str(index))
     content = response.content
     return hashlib.sha256(content).hexdigest()
 
 # Get the file hash from ipfs
-def get_artifacts(host, uri):
-    response = requests.get(host + "/artifacts/" + uri)
+def get_artifacts(session, host, uri):
+    response = session.get(host + "/artifacts/" + uri)
     decoded = response.json()
     if decoded["status"] == "OK":
         return decoded["result"]
