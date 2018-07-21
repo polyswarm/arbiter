@@ -5,6 +5,7 @@ import argparse
 import time
 import importlib
 from heapq import heappush, heappop
+from uuid import UUID
 import requests
 from web3 import Web3, HTTPProvider
 from web3.middleware import geth_poa_middleware
@@ -19,6 +20,17 @@ chain = os.environ.get("CHAIN")
 
 w3 = Web3(HTTPProvider(geth))
 w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+
+def check_uuid(uuid):
+    # Check that the uuid i pass is valid.
+    try:
+        converted = UUID(uuid, version=4)
+    except ValueError:
+        return False
+    return str(converted) == uuid
+
+def check_address(address):
+    return w3.isAddress(address)
 
 def decrypt_key(addr, secret):
     os.chdir(KEYDIR)
@@ -35,7 +47,7 @@ def decrypt_key(addr, secret):
     return None
 
 # This will settle any bounties
-def settle_bounties(heap, blocknumber):
+def settle_bounties(session, isTest, heap, blocknumber):
     settled = []
     while heap:
         head = heap[0]
@@ -43,80 +55,80 @@ def settle_bounties(heap, blocknumber):
         #  For any bounties blocknumber exceeds the reveal & vote windows... settle
         if int(head[0]) < blocknumber:
             guid = head[1]
-            response = requests.post(polyswarmd + "/bounties/" + guid + "/settle?account=" + address + "&chain=" + chain)
+            response = session.post(polyswarmd + "/bounties/" + guid + "/settle", params={"account": address, "chain": chain})
             transactions = response.json()["result"]["transactions"]
-            response = sign_transactions(transactions)
+            response = sign_transactions(session, transactions)
 
             if "errors" not in response.json()["result"]:
                 heappop(heap)
                 settled.append(guid)
             else:
-                print("Failed to settle bounty.")
-                sys.exit(13)
+                print_error(isTest, "Failed to settle bounty.", 13)
         else:
             break
     return settled
 
-def vote(guid, verdicts):
-    response = requests.post(polyswarmd + "/bounties/" + guid + "/vote?account=" + address + "&chain=" + chain, json={"verdicts": verdicts, "valid_bloom": True})
+def vote(session, guid, verdicts):
+    response = session.post(polyswarmd + "/bounties/" + guid + "/vote", params={"account": address, "chain": chain}, json={"verdicts": verdicts, "valid_bloom": True})
 
     transactions = response.json()["result"]["transactions"]
-    response = sign_transactions(transactions)
+    response = sign_transactions(session, transactions)
     return "errors" not in response.json()["result"]
 
-def sign_transactions(transactions):
+def sign_transactions(session, transactions):
     signed_transactions = []
     key = decrypt_key(address, password)
     for transaction in transactions:
         signed = w3.eth.account.signTransaction(transaction, key)
         raw = bytes(signed["rawTransaction"]).hex()
         signed_transactions.append(raw)
-    return requests.post(polyswarmd + "/transactions", json={"transactions": signed_transactions})
+    return session.post(polyswarmd + "/transactions", json={"transactions": signed_transactions})
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
-def listen_and_arbitrate(test, backend):
-    if not stake():
-        print("Failed to Stake Arbiter.")
-        sys.exit(14)
+def listen_and_arbitrate(isTest, backend):
+    session = requests.Session()
+    if not stake(session):
+        # Always exit, because it is unusable without staking
+        print_error(True, "Failed to Stake Arbiter.", 9)
     # to_settle is a head of bounty objects ordered by block number when then assertion reveal phase ends
     to_settle = []
     voted_bounties = set()
     while True:
         # Check bounties route
-        response = requests.get(polyswarmd + "/bounties/pending?chain=" + chain)
+        response = session.get(polyswarmd + "/bounties/pending", params={"chain": chain})
         decoded = response.json()
         if decoded["status"] == "OK":
             bounties = response.json()["result"]
             for bounty in bounties:
                 if bounty["guid"] not in voted_bounties:
+                    if not check_uuid(bounty["guid"]):
+                        print_error(isTest, "Bad GUID: %s" % bounty["guid"], 10)
+                        continue
                     # Vote
                     verdicts = backend.scan(polyswarmd, bounty["uri"])
                     if verdicts:
                         # If successfully volted, add to heap to be settled
-                        if vote(bounty["guid"], verdicts):
+                        if vote(session, bounty["guid"], verdicts):
                             # Mark voted
                             voted_bounties.add(bounty["guid"])
                             # Add to heap so it can be settled
                             heappush(to_settle, (int(bounty["expiration"])+50, bounty["guid"]))
                         else:
-                            print("Failed to submit vote.")
-                            sys.exit(11)
+                            print_error(isTest, "Failed to submit vote.", 11)
                     else:
-                        print("Failed to retrieve files from IPFS.")
-                        sys.exit(12)
+                        print_error(isTest, "Failed to retrieve files from IPFS.", 12)
 
             blocknumber = w3.eth.blockNumber
-            settled = settle_bounties(to_settle, blocknumber)
+            settled = settle_bounties(session, isTest, to_settle, blocknumber)
             for b in settled:
                 voted_bounties.remove(b)
-            if settled and test:
-                print("Test exited when some bounties were settled")
-                sys.exit(0)
+            if settled and isTest:
+                print_error(True, "Test exited when some bounties were settled", 0)
         time.sleep(1)
 
-def stake():
+def stake(session):
     minimumStake = 10000000000000000000000000
-    response = requests.get(polyswarmd + "/balances/" + address + "/staking/total?chain=" + chain)
+    response = session.get(polyswarmd + "/balances/" + address + "/staking/total", params={"chain": chain})
     if response.json()["status"] != "OK":
         return False
 
@@ -124,10 +136,15 @@ def stake():
     if minimumStake <= currentStake:
         return True
 
-    response = requests.post(polyswarmd + "/staking/deposit?account=" + address + "&chain=" + chain, json={"amount": str(minimumStake - currentStake)})
+    response = session.post(polyswarmd + "/staking/deposit", params={"account": address, "chain": chain}, json={"amount": str(minimumStake - currentStake)})
     transactions = response.json()["result"]["transactions"]
-    response = sign_transactions(transactions)
+    response = sign_transactions(session, transactions)
     return response.json()["status"] == "OK"
+
+def print_error(test, message, code):
+    print(message)
+    if test:
+        sys.exit(code)
 
 def main():
     sys.path.append('./backends')
@@ -138,6 +155,9 @@ def main():
     args = parser.parse_args()
 
     backend = importlib.import_module(args.backend)
+    if not check_address(address):
+        # Always exit. Unusable with a bad address
+        print_error(True, "Invalid address %s" % address, 8)
     listen_and_arbitrate(args.test, backend)
 
 if __name__ == "__main__":
