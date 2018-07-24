@@ -1,3 +1,16 @@
+# SECURITY WARNING
+
+`arbiter` implicitly trusts transaction signing requests from `polyswarmd`.
+A malicious instance of `polyswarmd` or an attacker with sufficient network capabilities may abuse this trust relationship to cause `arbiter` to transfer all NCT, ETH or other tokens to an attacker address.
+
+Therefore: 
+1. **ONLY CONNECT `arbiter` TO `polyswarmd` INSTANCES THAT YOU TRUST**
+2. **DO NOT ALLOW `arbiter` <-> `polyswarmd` COMMUNICATIONS TO TRAVERSE AN UNTRUSTED NETWORK LINK**
+
+In other words, only run `arbiter` on a co-located `localhost` with `polyswarmd`.
+
+This is a temporarily limitation - `arbiter`'s trust in `polyswarmd` will be eliminated in the near future.
+
 # Arbiter
 
 This project hosts a means to run an arbiter easily.
