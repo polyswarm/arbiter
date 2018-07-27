@@ -93,6 +93,12 @@ def listen_and_arbitrate(isTest, backend):
     # to_settle is a head of bounty objects ordered by block number when then assertion reveal phase ends
     to_settle = []
     voted_bounties = set()
+    voting_window = get_vote_window()
+    reveal_window = get_reveal_window()
+
+    if not voting_window or not get_reveal_window:
+        print_error(isTest, "Failed to get bounty windows.", 14)
+
     while True:
         # Check bounties route
         response = session.get(polyswarmd + "/bounties/pending", params={"chain": chain})
@@ -112,7 +118,7 @@ def listen_and_arbitrate(isTest, backend):
                             # Mark voted
                             voted_bounties.add(bounty["guid"])
                             # Add to heap so it can be settled
-                            heappush(to_settle, (int(bounty["expiration"])+50, bounty["guid"]))
+                            heappush(to_settle, (int(bounty["expiration"]) + voting_window + reveal_window, bounty["guid"]))
                         else:
                             print_error(isTest, "Failed to submit vote.", 11)
                     else:
@@ -146,6 +152,16 @@ def print_error(test, message, code):
     if test:
         sys.exit(code)
 
+def get_vote_window():
+    response = requests.get(polyswarmd + "/bounties/window/vote?chain=" + chain)
+    if response.json()['status'] == "OK":
+        return response.json()['result']['blocks']
+
+def get_reveal_window():
+    response = requests.get(polyswarmd + "/bounties/window/reveal?chain=" + chain)
+    if response.json()['status'] == "OK":
+        return response.json()['result']['blocks']
+    
 def main():
     sys.path.append('./backends')
     parser = argparse.ArgumentParser(description="Run an arbiter backend.")
