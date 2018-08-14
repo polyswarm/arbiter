@@ -2,10 +2,11 @@
 import sqlite3
 import hashlib
 import requests
+import os
 
 def scan(host, uri):
     session = requests.Session()
-    conn = sqlite3.connect('../artifacts/truth.db')
+    conn = sqlite3.connect(os.path.join(os.getcwd(), "artifacts", "truth.db"))
     artifacts = get_artifacts(session, host, uri)
     hashes = [hash_file(session, host, uri, i) for i, v in enumerate(artifacts)]
     verdicts = [find_truth(conn, h) for i, h in enumerate(hashes)]

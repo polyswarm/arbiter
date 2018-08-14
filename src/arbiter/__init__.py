@@ -1,9 +1,7 @@
 import os
 import glob
 import sys
-import argparse
 import time
-import importlib
 from eth_abi import decode_single
 from heapq import heappush, heappop
 from uuid import UUID
@@ -135,6 +133,10 @@ def vote(session, guid, verdicts):
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
 def listen_and_arbitrate(isTest, backend):
+    if not check_address(address):
+        # Always exit. Unusable with a bad address
+        print_error(True, "Invalid address %s" % address, 7)
+
     session = requests.Session()
     if not stake(session):
         # Always exit, because it is unusable without staking
@@ -195,20 +197,3 @@ def get_reveal_window():
     response = requests.get(polyswarmd + "/bounties/window/reveal?chain=" + chain)
     if response.json()['status'] == "OK":
         return response.json()['result']['blocks']
-
-def main():
-    sys.path.append('./backends')
-    parser = argparse.ArgumentParser(description="Run an arbiter backend.")
-
-    parser.add_argument("--backend", help="Select the backend", default="verbatim")
-    parser.add_argument("--test", help="Exits on successful settle", action="store_true",)
-    args = parser.parse_args()
-
-    backend = importlib.import_module(args.backend)
-    if not check_address(address):
-        # Always exit. Unusable with a bad address
-        print_error(True, "Invalid address %s" % address, 7)
-    listen_and_arbitrate(args.test, backend)
-
-if __name__ == "__main__":
-    main()

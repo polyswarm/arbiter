@@ -5,3 +5,7 @@ staging
 priv_testnet/
 arbiter-verbatim
 __pycache__/
+build/
+dist/
+*.egg-info
+.vscode/
