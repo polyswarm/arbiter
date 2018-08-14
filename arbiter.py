@@ -4,6 +4,7 @@ import sys
 import argparse
 import time
 import importlib
+from eth_abi import decode_single
 from heapq import heappush, heappop
 from uuid import UUID
 import requests
@@ -41,7 +42,7 @@ def decrypt_key(addr, secret):
     possible_matches = glob.glob("*" + temp)
     os.chdir('..')
     if len(possible_matches) == 1:
-        with open(KEYDIR + "/" + possible_matches[0]) as keyfile:
+        with open(os.path.join(KEYDIR, possible_matches[0])) as keyfile:
             encrypted = keyfile.read()
             return w3.eth.account.decrypt(encrypted, secret)
     return None
@@ -57,23 +58,18 @@ def settle_bounties(session, isTest, heap, blocknumber):
             guid = head[1]
             response = session.post(polyswarmd + "/bounties/" + guid + "/settle", params={"account": address, "chain": chain})
             transactions = response.json()["result"]["transactions"]
-            response = sign_transactions(session, transactions)
-
-            if "errors" not in response.json()["result"]:
-                heappop(heap)
-                settled.append(guid)
+            if verify_settle(guid, transactions):
+                response = sign_transactions(session, transactions)
+                if "errors" not in response.json()["result"]:
+                    heappop(heap)
+                    settled.append(guid)
+                else:
+                    print_error(isTest, "Failed to settle bounty.", 13)
             else:
-                print_error(isTest, "Failed to settle bounty.", 13)
+                print_error(True, "Settle transaction does not match expectations", 1)
         else:
             break
     return settled
-
-def vote(session, guid, verdicts):
-    response = session.post(polyswarmd + "/bounties/" + guid + "/vote", params={"account": address, "chain": chain}, json={"verdicts": verdicts, "valid_bloom": True})
-
-    transactions = response.json()["result"]["transactions"]
-    response = sign_transactions(session, transactions)
-    return "errors" not in response.json()["result"]
 
 def sign_transactions(session, transactions):
     signed_transactions = []
@@ -83,6 +79,48 @@ def sign_transactions(session, transactions):
         raw = bytes(signed["rawTransaction"]).hex()
         signed_transactions.append(raw)
     return session.post(polyswarmd + "/transactions", json={"transactions": signed_transactions})
+
+def stake(session):
+    minimumStake = 10000000000000000000000000
+    response = session.get(polyswarmd + "/balances/" + address + "/staking/total", params={"chain": chain})
+    if response.json()["status"] != "OK":
+        return False
+
+    currentStake = int(response.json()["result"])
+    if minimumStake <= currentStake:
+        return True
+
+    amount = str(minimumStake - currentStake)
+    response = session.post(polyswarmd + "/staking/deposit", params={"account": address, "chain": chain}, json={"amount": amount})
+    transactions = response.json()["result"]["transactions"]
+    if verify_stake(amount, transactions):
+        response = sign_transactions(session, transactions)
+        return response.json()["status"] == "OK"
+    # We exit here, no need to return
+    print_error(True, "Staking transactions do not match expectations", 1)
+
+def verify_vote(guid, verdicts, transactions):
+    return True
+
+def verify_settle(guid, transactions):
+    return True
+
+def verify_stake(amount, transactions):
+    transaction_count = len(transactions)
+    # We should add in address validation later
+    (address, approved) = decode_single("(address,uint256)", bytes.fromhex(transactions[0]["data"][10:]))
+    stake = decode_single("uint256", w3.toBytes(hexstr=transactions[1]["data"][10:]))
+    return transaction_count == 2 and check_address(address) and int(stake) == int(amount) and int(approved) == int(amount)
+
+def vote(session, guid, verdicts):
+    response = session.post(polyswarmd + "/bounties/" + guid + "/vote", params={"account": address, "chain": chain}, json={"verdicts": verdicts, "valid_bloom": True})
+
+    transactions = response.json()["result"]["transactions"]
+    if verify_vote(guid, verdicts, transactions):
+        response = sign_transactions(session, transactions)
+        return "errors" not in response.json()["result"]
+    else:
+        print_error(True, "Vote transaction does not match expectations", 1)
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
 def listen_and_arbitrate(isTest, backend):
@@ -132,21 +170,6 @@ def listen_and_arbitrate(isTest, backend):
                 print_error(True, "Test exited when some bounties were settled", 0)
         time.sleep(1)
 
-def stake(session):
-    minimumStake = 10000000000000000000000000
-    response = session.get(polyswarmd + "/balances/" + address + "/staking/total", params={"chain": chain})
-    if response.json()["status"] != "OK":
-        return False
-
-    currentStake = int(response.json()["result"])
-    if minimumStake <= currentStake:
-        return True
-
-    response = session.post(polyswarmd + "/staking/deposit", params={"account": address, "chain": chain}, json={"amount": str(minimumStake - currentStake)})
-    transactions = response.json()["result"]["transactions"]
-    response = sign_transactions(session, transactions)
-    return response.json()["status"] == "OK"
-
 def print_error(test, message, code):
     print(message)
     if test:
@@ -161,7 +184,7 @@ def get_reveal_window():
     response = requests.get(polyswarmd + "/bounties/window/reveal?chain=" + chain)
     if response.json()['status'] == "OK":
         return response.json()['result']['blocks']
-    
+
 def main():
     sys.path.append('./backends')
     parser = argparse.ArgumentParser(description="Run an arbiter backend.")
@@ -173,7 +196,7 @@ def main():
     backend = importlib.import_module(args.backend)
     if not check_address(address):
         # Always exit. Unusable with a bad address
-        print_error(True, "Invalid address %s" % address, 8)
+        print_error(True, "Invalid address %s" % address, 7)
     listen_and_arbitrate(args.test, backend)
 
 if __name__ == "__main__":
