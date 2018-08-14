@@ -109,9 +109,8 @@ def stake(session):
 
 def verify_vote(guid, verdicts, transactions):
     (vote_guid, vote_verdicts, validBloom) = decode_single("(uint256,uint256,bool)", w3.toBytes(hexstr=transactions[0]["data"][10:]))
-    print(verdicts)
-    print(vote_verdicts)
-    if check_int_uuid(vote_guid) and check_uuid(guid) and str(UUID(int=vote_guid, version=4)) == guid:
+    verdicts_int = sum([1 << n if b else 0 for n, b in enumerate(verdicts)])
+    if check_int_uuid(vote_guid) and check_uuid(guid) and str(UUID(int=vote_guid, version=4)) == guid and verdicts_int == vote_verdicts:
         return True
     return False
 
