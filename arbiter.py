@@ -110,12 +110,11 @@ def stake(session):
 def verify_vote(guid, verdicts, transactions):
     (vote_guid, vote_verdicts, validBloom) = decode_single("(uint256,uint256,bool)", w3.toBytes(hexstr=transactions[0]["data"][10:]))
     verdicts_int = sum([1 << n if b else 0 for n, b in enumerate(verdicts)])
-    if check_int_uuid(vote_guid) and check_uuid(guid) and str(UUID(int=vote_guid, version=4)) == guid and verdicts_int == vote_verdicts:
-        return True
-    return False
+    return check_int_uuid(vote_guid) and check_uuid(guid) and str(UUID(int=vote_guid, version=4)) == guid and verdicts_int == vote_verdicts
 
 def verify_settle(guid, transactions):
-    return True
+    settle_guid = decode_single("uint256", w3.toBytes(hexstr=transactions[0]["data"][10:]))
+    return check_int_uuid(settle_guid) and check_uuid(guid) and str(UUID(int=settle_guid, version=4)) == guid
 
 def verify_stake(amount, transactions):
     transaction_count = len(transactions)
