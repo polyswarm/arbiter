@@ -30,6 +30,14 @@ def check_uuid(uuid):
         return False
     return str(converted) == uuid
 
+def check_int_uuid(uuid):
+    # Check that the uuid i pass is valid.
+    try:
+        converted = UUID(int=uuid, version=4)
+    except ValueError:
+        return False
+    return converted.int == uuid
+
 def check_address(address):
     return w3.isAddress(address)
 
@@ -100,7 +108,12 @@ def stake(session):
     print_error(True, "Staking transactions do not match expectations", 1)
 
 def verify_vote(guid, verdicts, transactions):
-    return True
+    (vote_guid, vote_verdicts, validBloom) = decode_single("(uint256,uint256,bool)", w3.toBytes(hexstr=transactions[0]["data"][10:]))
+    print(verdicts)
+    print(vote_verdicts)
+    if check_int_uuid(vote_guid) and check_uuid(guid) and str(UUID(int=vote_guid, version=4)) == guid:
+        return True
+    return False
 
 def verify_settle(guid, transactions):
     return True
