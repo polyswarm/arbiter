@@ -4,7 +4,8 @@ import sys
 import time
 import json
 from eth_abi import decode_single
-from heapq import heappush, heappop
+from arbiter.scheduler import SchedulerQueue
+
 from uuid import UUID
 import requests
 from web3.auto import w3
@@ -26,19 +27,21 @@ def check_address(address):
     return w3.isAddress(address)
 
 def check_uuid(uuid):
-    # Check that the uuid i pass is valid.
+    """Check that the uuid i pass is valid."""
     try:
         converted = UUID(uuid, version=4)
     except ValueError:
         return False
+
     return str(converted) == uuid
 
 def check_int_uuid(uuid):
-    # Check that the uuid i pass is valid.
+    """Check that the int uuid i pass is valid."""
     try:
         converted = UUID(int=uuid, version=4)
     except ValueError:
         return False
+
     return converted.int == uuid
 
 def decrypt_key(addr, secret):
@@ -47,12 +50,14 @@ def decrypt_key(addr, secret):
         temp = addr[2:]
     else:
         temp = addr
+
     possible_matches = glob.glob("*" + temp)
     os.chdir('..')
     if len(possible_matches) == 1:
         with open(os.path.join(KEYDIR, possible_matches[0])) as keyfile:
             encrypted = keyfile.read()
             return w3.eth.account.decrypt(encrypted, secret)
+
     return None
 
 async def get_reveal_window(session):
@@ -60,40 +65,40 @@ async def get_reveal_window(session):
     async with session.get(url, params=[("chain", chain)]) as response:
         message = await response.json()
         if message['status'] == "OK":
-            return message['result']['blocks']
+            return int(message['result']['blocks'])
 
 async def get_vote_window(session):
     url = "{0}/bounties/window/vote".format(base_url)
     async with session.get(url, params=[("chain", chain)]) as response:
         message = await response.json()
         if message['status'] == "OK":
-            return message['result']['blocks']
+            return int(message['result']['blocks'])
 
 # This will settle any bounties
-async def post_settle(session, isTest, heap, blocknumber):
+async def post_settle(session, isTest, guid):
     settled = []
-    while heap:
-        expiration = heap[0][0]
-        guid = heap[0][1]
-        url = "{0}/bounties/{1}/settle".format(base_url, guid)
-        params = [("account", address), ("chain", chain)]
-        #  For any bounties blocknumber exceeds the reveal & vote windows... settle
-        if int(expiration) < blocknumber:
-            async with session.post(url, params=params) as response:
-                message = await response.json()
-                transactions = message["result"]["transactions"]
-                if verify_settle(guid, transactions):
-                    response = await post_transactions(session, transactions)
-                    if "errors" not in message["result"]:
-                        heappop(heap)
-                        settled.append(guid)
-                    else:
-                        print_error(isTest, "Failed to settle bounty.", 13)
-                else:
-                    print_error(True, "Settle transaction does not match expectations", 1)
+    url = "{0}/bounties/{1}/settle".format(base_url, guid)
+    params = [("account", address), ("chain", chain)]
+    success = False
+    async with session.post(url, params=params) as response:
+        message = await response.json()
+        transactions = message["result"]["transactions"]
+        if verify_settle(guid, transactions):
+            transaction_response = await post_transactions(session, transactions)
+            if "errors" not in transaction_response["result"]:
+                settled.append(guid)
+                success = True
+            else:
+                print(transaction_response["result"]["errors"])
+                print_error(isTest, "Failed to settle bounty.", 13)
+
         else:
-            break
-    return settled
+            print_error(True, "Settle transaction does not match expectations", 1)
+
+        if settled and isTest:
+            print_error(True, "Test exited when some bounties were settled", 0)
+
+        return success
 
 async def post_stake(session):
     minimumStake = 10000000000000000000000000
@@ -131,30 +136,26 @@ async def post_transactions(session, transactions):
         async with session.post(url, json={"transactions": signed_transactions}) as response:
             return await response.json()
 
-async def post_vote(session, isTest, heap, blocknumber):
-    success = True
-    while heap:
-        expiration = heap[0][0]
-        guid = heap[0][1]
-        verdicts = heap[0][2]
-        url = "{0}/bounties/{1}/vote".format(base_url, guid)
-        params = [("account", address), ("chain", chain)]
-        data = {"verdicts": verdicts, "valid_bloom": True}
-        #  For any bounties blocknumber exceeds the reveal & vote windows... settle
-        if int(expiration) < blocknumber:
-            async with session.post(url, params=params, json=data) as response:
-                message = await response.json()
-                transactions = message["result"]["transactions"]
-                if verify_vote(guid, verdicts, transactions):
-                    response = await post_transactions(session, transactions)
-                    if "errors" not in message["result"]:
-                        heappop(heap)
-                    else:
-                        success = False
-                else:
-                    print_error(True, "Vote transaction does not match expectations", 1)
+async def post_vote(session, isTest, guid, verdicts):
+    success = False
+    url = "{0}/bounties/{1}/vote".format(base_url, guid)
+    params = [("account", address), ("chain", chain)]
+    data = {"verdicts": verdicts, "valid_bloom": True}
+    async with session.post(url, params=params, json=data) as response:
+        message = await response.json()
+        transactions = message["result"]["transactions"]
+
+        if verify_vote(guid, verdicts, transactions):
+            transaction_response = await post_transactions(session, transactions)
+            if "errors" not in transaction_response["result"]:
+                success = True
+            else:
+                print_error(isTest, "Failed to vote on bounty.", 14)
+
         else:
-            break;
+            print_error(True, "Vote transaction does not match expectations", 1)
+
+    return success
 
 def print_error(test, message, code):
     print(message)
@@ -164,11 +165,13 @@ def print_error(test, message, code):
 def verify_vote(guid, verdicts, transactions):
     (vote_guid, vote_verdicts, validBloom) = decode_single("(uint256,uint256,bool)", w3.toBytes(hexstr=transactions[0]["data"][10:]))
     verdicts_int = sum([1 << n if b else 0 for n, b in enumerate(verdicts)])
-    return check_int_uuid(vote_guid) and check_uuid(guid) and str(UUID(int=vote_guid, version=4)) == guid and verdicts_int == vote_verdicts
+    transaction_count = len(transactions)
+    return transaction_count == 1 and check_int_uuid(vote_guid) and check_uuid(guid) and str(UUID(int=vote_guid, version=4)) == guid and verdicts_int == vote_verdicts
 
 def verify_settle(guid, transactions):
     settle_guid = decode_single("uint256", w3.toBytes(hexstr=transactions[0]["data"][10:]))
-    return check_int_uuid(settle_guid) and check_uuid(guid) and str(UUID(int=settle_guid, version=4)) == guid
+    transaction_count = len(transactions)
+    return transaction_count == 1 and check_int_uuid(settle_guid) and check_uuid(guid) and str(UUID(int=settle_guid, version=4)) == guid
 
 def verify_stake(amount, transactions):
     transaction_count = len(transactions)
@@ -184,6 +187,7 @@ async def get_artifacts(session, isTest, uri):
         if decoded["status"] == "OK":
             files = decoded["result"]
             return files
+
     return list()
 
 async def get_artifact_contents(session, isTest, uri, index):
@@ -191,6 +195,7 @@ async def get_artifact_contents(session, isTest, uri, index):
     async with session.get(url) as response:
         if response.status == 200:
             return bytearray(await response.read())
+
         print_error(isTest, "Failed to retrieve files from IPFS.", 12)
         return None
 
@@ -201,9 +206,7 @@ async def listen_and_arbitrate(isTest, backend):
         # Always exit. Unusable with a bad address
         print_error(True, "Invalid address %s" % address, 7)
 
-    to_settle = []
-    to_vote = []
-
+    scheduler = SchedulerQueue()
     async with aiohttp.ClientSession() as session:
         if not await post_stake(session):
             # Always exit, because it is unusable without staking
@@ -218,10 +221,8 @@ async def listen_and_arbitrate(isTest, backend):
             while True:
                 message = json.loads(await ws.recv())
                 if message["event"] == "block":
-                    await post_vote(session, isTest, to_vote, message["data"]["number"])
-                    settled = await post_settle(session, isTest, to_settle, message["data"]["number"])
-                    if settled and isTest:
-                        print_error(True, "Test exited when some bounties were settled", 0)
+                    await scheduler.execute_scheduled(message["data"]["number"])
+
                 elif message["event"] == "bounty":
                     bounty = message["data"]
                     if not check_uuid(bounty["guid"]):
@@ -236,8 +237,12 @@ async def listen_and_arbitrate(isTest, backend):
                             print_error(isTest, "Failed to retrieve files from IPFS.", 12)
                             # If not exiting, just send zero
                             verdict.append(False)
+                            continue
 
                         verdicts.append(await backend.scan(file))
-                    # Add bounty to vote & settle queues (Should take a func & number tuple)
-                    heappush(to_vote, (int(bounty["expiration"])+reveal_window, bounty["guid"], verdicts))
-                    heappush(to_settle, (int(bounty["expiration"])+reveal_window+voting_window, bounty["guid"]))
+
+                    vote = lambda session, isTest, guid, verdicts: post_vote(session, isTest, guid, verdicts)
+                    settle = lambda session, isTest, guid: post_settle(session, isTest, guid)
+
+                    await scheduler.schedule(int(bounty["expiration"])+reveal_window, vote, {"session": session, "isTest": isTest, "guid": bounty["guid"], "verdicts": verdicts})
+                    await scheduler.schedule(int(bounty["expiration"])+reveal_window+voting_window, settle, {"session": session, "isTest": isTest, "guid": bounty["guid"]})
