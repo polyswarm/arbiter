@@ -1,8 +1,9 @@
 import sys
 import argparse
 import importlib
+import asyncio
 
-from arbiter import listen_and_arbitrate, check_address, print_error
+from arbiter import listen_and_arbitrate
 
 def main():
     parser = argparse.ArgumentParser(description="Run an arbiter backend.")
@@ -12,7 +13,7 @@ def main():
     args = parser.parse_args()
 
     backend = importlib.import_module("backends.{0}".format(args.backend))
-    listen_and_arbitrate(args.test, backend)
+    asyncio.get_event_loop().run_until_complete(listen_and_arbitrate(args.test, backend))
 
 if __name__ == "__main__":
     main()
