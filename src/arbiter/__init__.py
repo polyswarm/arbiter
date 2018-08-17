@@ -120,10 +120,14 @@ async def post_stake(session):
             message = await deposit_response.json()
             transactions = message["result"]["transactions"]
             if verify_stake(amount, transactions):
-                response = await post_transactions(session, transactions)
-                return message["status"] == "OK"
+                transaction_response = await post_transactions(session, transactions)
+                if "errors" not in transaction_response["result"]:
+                    return True
+
+                return False
+
+            print_error(True, "Staking transactions do not match expectations", 1)
     # We exit here, no need to return
-    print_error(True, "Staking transactions do not match expectations", 1)
 
 async def post_transactions(session, transactions):
     url = "{0}/transactions".format(base_url)
@@ -133,8 +137,8 @@ async def post_transactions(session, transactions):
         signed = w3.eth.account.signTransaction(transaction, key)
         raw = bytes(signed["rawTransaction"]).hex()
         signed_transactions.append(raw)
-        async with session.post(url, json={"transactions": signed_transactions}) as response:
-            return await response.json()
+    async with session.post(url, json={"transactions": signed_transactions}) as response:
+        return await response.json()
 
 async def post_vote(session, isTest, guid, verdicts):
     success = False
