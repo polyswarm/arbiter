@@ -16,6 +16,7 @@ polyswarmd = os.environ.get("POLYSWARM_HOST")
 geth = os.environ.get("GETH")
 address = os.environ.get("ADDRESS")
 password = os.environ.get("PASSWORD")
+api_key = os.environ.get("API_KEY")
 chain = os.environ.get("CHAIN")
 
 w3 = Web3(HTTPProvider(geth))
@@ -86,7 +87,7 @@ def sign_transactions(session, transactions):
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
 def listen_and_arbitrate(isTest, backend):
-    session = requests.Session()
+    session = requests.Session(headers={'Authorization': api_key})
     if not stake(session):
         # Always exit, because it is unusable without staking
         print_error(True, "Failed to Stake Arbiter.", 9)
@@ -153,12 +154,12 @@ def print_error(test, message, code):
         sys.exit(code)
 
 def get_vote_window():
-    response = requests.get(polyswarmd + "/bounties/window/vote?chain=" + chain)
+    response = requests.get(polyswarmd + "/bounties/window/vote?chain=" + chain, headers={'Authorization': api_key})
     if response.json()['status'] == "OK":
         return response.json()['result']['blocks']
 
 def get_reveal_window():
-    response = requests.get(polyswarmd + "/bounties/window/reveal?chain=" + chain)
+    response = requests.get(polyswarmd + "/bounties/window/reveal?chain=" + chain, headers={'Authorization': api_key})
     if response.json()['status'] == "OK":
         return response.json()['result']['blocks']
     
