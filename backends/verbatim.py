@@ -3,8 +3,9 @@ import sqlite3
 import hashlib
 import requests
 
-def scan(host, uri):
+def scan(host, uri, api_key):
     session = requests.Session()
+    session.headers.update({'Authorization': api_key})
     conn = sqlite3.connect('../artifacts/truth.db')
     artifacts = get_artifacts(session, host, uri)
     hashes = [hash_file(session, host, uri, i) for i, v in enumerate(artifacts)]

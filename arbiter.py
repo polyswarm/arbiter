@@ -12,7 +12,7 @@ from web3.middleware import geth_poa_middleware
 
 KEYDIR = "./keystore"
 
-polyswarmd = os.environ.get("POLYSWARM_HOST")
+polyswarmd = os.environ.get("POLYSWARMD_HOST")
 geth = os.environ.get("GETH")
 address = os.environ.get("ADDRESS")
 password = os.environ.get("PASSWORD")
@@ -87,7 +87,9 @@ def sign_transactions(session, transactions):
 
 # Listen to polyswarmd /bounties/pending route to find expired bounties
 def listen_and_arbitrate(isTest, backend):
-    session = requests.Session(headers={'Authorization': api_key})
+    session = requests.Session()
+    session.headers.update({'Authorization': api_key})
+
     if not stake(session):
         # Always exit, because it is unusable without staking
         print_error(True, "Failed to Stake Arbiter.", 9)
@@ -112,7 +114,7 @@ def listen_and_arbitrate(isTest, backend):
                         print_error(isTest, "Bad GUID: %s" % bounty["guid"], 10)
                         continue
                     # Vote
-                    verdicts = backend.scan(polyswarmd, bounty["uri"])
+                    verdicts = backend.scan(polyswarmd, bounty["uri"], api_key)
                     if verdicts:
                         # If successfully volted, add to heap to be settled
                         if vote(session, bounty["guid"], verdicts):
