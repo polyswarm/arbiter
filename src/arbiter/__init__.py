@@ -248,5 +248,5 @@ async def listen_and_arbitrate(isTest, backend):
                     vote = lambda session, isTest, guid, verdicts: post_vote(session, isTest, guid, verdicts)
                     settle = lambda session, isTest, guid: post_settle(session, isTest, guid)
 
-                    await scheduler.schedule(int(bounty["expiration"])+reveal_window, vote, {"session": session, "isTest": isTest, "guid": bounty["guid"], "verdicts": verdicts})
-                    await scheduler.schedule(int(bounty["expiration"])+reveal_window+voting_window, settle, {"session": session, "isTest": isTest, "guid": bounty["guid"]})
+                    await scheduler.schedule(int(bounty["expiration"])+reveal_window, bounty["guid"], vote, {"session": session, "isTest": isTest, "guid": bounty["guid"], "verdicts": verdicts})
+                    await scheduler.schedule(int(bounty["expiration"])+reveal_window+voting_window, bounty["guid"], settle, {"session": session, "isTest": isTest, "guid": bounty["guid"]})
