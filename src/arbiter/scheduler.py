@@ -9,9 +9,12 @@ class SchedulerQueue:
         self.lock = asyncio.Lock()
         self.modify = asyncio.Lock()
 
-    async def schedule(self, blocknumber, function, args):
+    # We take a guid here, not for any functionality, but to prevent
+    # the heap from trying to compare the functions if blocknumber is the same
+    # between two scheduled events.
+    async def schedule(self, blocknumber, guid, function, args):
         await self.modify.acquire()
-        heappush(self.queue, (blocknumber, (function, args)))
+        heappush(self.queue, (blocknumber, (guid, function, args)))
         self.qsize += 1
         self.modify.release()
 
@@ -34,13 +37,14 @@ class SchedulerQueue:
             event = await self.pop()
             while event is not None:
                 expiration = event[0]
-                function = event[1][0]
-                args = event[1][1]
+                guid = event[1][0]
+                function = event[1][1]
+                args = event[1][2]
                 if int(expiration) < block:
                     await function(**args)
                     event = await self.pop()
                 else:
                     # Throw it back on the front
-                    await self.schedule(expiration, function, args)
+                    await self.schedule(expiration, guid, function, args)
                     break
         self.lock.release()
