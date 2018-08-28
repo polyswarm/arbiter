@@ -6,7 +6,12 @@ RUN apt-get update && apt-get install -y \
         jq && \
     rm -rf /var/lib/apt/lists/*
 
-ADD /requirements.txt /requirements.txt
-RUN pip install -r requirements.txt
-ADD . .
-CMD ["python3", "arbiter.py", "--backend", "verbatim"]
+WORKDIR /usr/src/app
+
+COPY requirements.txt ./
+RUN set -x && pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+RUN set -x && pip install .
+
+CMD ["arbiter"]

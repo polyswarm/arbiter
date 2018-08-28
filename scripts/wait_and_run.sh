@@ -8,4 +8,4 @@ export POLYSWARMD_HOST="http://${POLYSWARMD_HOST}"
 
 echo "arbiter API key: ${API_KEY}"
 
-python arbiter.py $*
+arbiter $*
