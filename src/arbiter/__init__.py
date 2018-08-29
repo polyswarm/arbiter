@@ -18,6 +18,7 @@ polyswarmd = os.environ.get("POLYSWARMD_HOST")
 port = os.environ.get("POLYSWARMD_PORT")
 address = os.environ.get("ADDRESS")
 password = os.environ.get("PASSWORD")
+api_key = os.environ.get("API_KEY")
 chain = os.environ.get("CHAIN")
 
 ws_url = "ws://{0}:{1}/events".format(polyswarmd, port)
@@ -211,7 +212,8 @@ async def listen_and_arbitrate(isTest, backend):
         print_error(True, "Invalid address %s" % address, 7)
 
     scheduler = SchedulerQueue()
-    async with aiohttp.ClientSession() as session:
+    headers = {'Authorization': api_key} if api_key else {}
+    async with aiohttp.ClientSession(headers=headers) as session:
         if not await post_stake(session):
             # Always exit, because it is unusable without staking
             print_error(True, "Failed to Stake Arbiter.", 9)
@@ -221,7 +223,7 @@ async def listen_and_arbitrate(isTest, backend):
         if not voting_window or not get_reveal_window:
             # Cannot vote/settle without this info
             print_error(True, "Failed to get bounty windows.", 14)
-        async with websockets.connect(ws_url) as ws:
+        async with websockets.connect(ws_url, extra_headers=headers) as ws:
             while True:
                 message = json.loads(await ws.recv())
                 if message["event"] == "block":
