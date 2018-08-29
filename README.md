@@ -3,7 +3,7 @@
 `arbiter` implicitly trusts transaction signing requests from `polyswarmd`.
 A malicious instance of `polyswarmd` or an attacker with sufficient network capabilities may abuse this trust relationship to cause `arbiter` to transfer all NCT, ETH or other tokens to an attacker address.
 
-Therefore: 
+Therefore:
 1. **ONLY CONNECT `arbiter` TO `polyswarmd` INSTANCES THAT YOU TRUST**
 2. **DO NOT ALLOW `arbiter` <-> `polyswarmd` COMMUNICATIONS TO TRAVERSE AN UNTRUSTED NETWORK LINK**
 
@@ -17,7 +17,7 @@ This project hosts a means to run an arbiter easily.
 
 ## Run an Arbiter
 
-`python arbiter.py --backends <name of backend module>`
+`arbiter --backends <name of backend module>`
 
 The default backend is `verbatim` if no backend is set.
 
