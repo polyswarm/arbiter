@@ -12,8 +12,7 @@ from web3.auto import w3
 import aiohttp
 import websockets
 
-KEYDIR = "./keystore"
-
+KEYDIR = os.environ.get("KEYDIR", "./keystore")
 polyswarmd = os.environ.get("POLYSWARMD_HOST")
 port = os.environ.get("POLYSWARMD_PORT")
 address = os.environ.get("ADDRESS")
