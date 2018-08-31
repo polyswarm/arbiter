@@ -61,20 +61,20 @@ def decrypt_key(addr, secret):
     return None
 
 async def get_reveal_window(session):
-    url = "{0}/bounties/window/reveal".format(base_url)
+    url = "{0}/bounties/parameters".format(base_url)
     params = [("account", address), ("chain", chain)]
     async with session.get(url, params=params) as response:
         message = await response.json()
         if message['status'] == "OK":
-            return int(message['result']['blocks'])
+            return int(message['result']['assertion_reveal_window'])
 
 async def get_vote_window(session):
-    url = "{0}/bounties/window/vote".format(base_url)
+    url = "{0}/bounties/parameters".format(base_url)
     params = [("account", address), ("chain", chain)]
     async with session.get(url, params=params) as response:
         message = await response.json()
         if message['status'] == "OK":
-            return int(message['result']['blocks'])
+            return int(message['result']['arbiter_vote_window'])
 
 # This will settle any bounties
 async def post_settle(session, isTest, guid):
