@@ -62,14 +62,16 @@ def decrypt_key(addr, secret):
 
 async def get_reveal_window(session):
     url = "{0}/bounties/window/reveal".format(base_url)
-    async with session.get(url, params=[("chain", chain)]) as response:
+    params = [("account", address), ("chain", chain)]
+    async with session.get(url, params=params) as response:
         message = await response.json()
         if message['status'] == "OK":
             return int(message['result']['blocks'])
 
 async def get_vote_window(session):
     url = "{0}/bounties/window/vote".format(base_url)
-    async with session.get(url, params=[("chain", chain)]) as response:
+    params = [("account", address), ("chain", chain)]
+    async with session.get(url, params=params) as response:
         message = await response.json()
         if message['status'] == "OK":
             return int(message['result']['blocks'])
@@ -103,7 +105,8 @@ async def post_settle(session, isTest, guid):
 async def post_stake(session):
     minimumStake = 10000000000000000000000000
     url = "{0}/balances/{1}/staking/total".format(base_url, address)
-    async with session.get(url, params=[("chain", chain)]) as query_response:
+    params = [("account", address), ("chain", chain)]
+    async with session.get(url, params=params) as query_response:
         message = await query_response.json()
         if message["status"] != "OK":
             return False
@@ -137,7 +140,8 @@ async def post_transactions(session, transactions):
         signed = w3.eth.account.signTransaction(transaction, key)
         raw = bytes(signed["rawTransaction"]).hex()
         signed_transactions.append(raw)
-    async with session.post(url, json={"transactions": signed_transactions}) as response:
+    params = [("account", address), ("chain", chain)]
+    async with session.post(url, params=params, json={"transactions": signed_transactions}) as response:
         return await response.json()
 
 async def post_vote(session, isTest, guid, verdicts):
@@ -186,7 +190,8 @@ def verify_stake(amount, transactions):
 
 async def get_artifacts(session, isTest, uri):
     url = "{0}/artifacts/{1}".format(base_url, uri)
-    async with session.get(url) as response:
+    params = [("account", address), ("chain", chain)]
+    async with session.get(url, params=params) as response:
         decoded = await response.json()
         if decoded["status"] == "OK":
             files = decoded["result"]
@@ -196,7 +201,8 @@ async def get_artifacts(session, isTest, uri):
 
 async def get_artifact_contents(session, isTest, uri, index):
     url = "{0}/artifacts/{1}/{2}".format(base_url, uri, index)
-    async with session.get(url) as response:
+    params = [("account", address), ("chain", chain)]
+    async with session.get(url, params=params) as response:
         if response.status == 200:
             return bytearray(await response.read())
 
