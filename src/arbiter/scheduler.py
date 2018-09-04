@@ -1,4 +1,6 @@
 from heapq import heappop, heappush
+from functools import total_ordering
+from typing import Any
 import asyncio
 
 class SchedulerQueue:
@@ -12,9 +14,9 @@ class SchedulerQueue:
     # We take a guid here, not for any functionality, but to prevent
     # the heap from trying to compare the functions if blocknumber is the same
     # between two scheduled events.
-    async def schedule(self, blocknumber, guid, function, args):
+    async def schedule(self, task):
         await self.modify.acquire()
-        heappush(self.queue, (blocknumber, (guid, function, args)))
+        heappush(self.queue, task)
         self.qsize += 1
         self.modify.release()
 
@@ -36,15 +38,28 @@ class SchedulerQueue:
             self.lastBlock = block
             event = await self.pop()
             while event is not None:
-                expiration = event[0]
-                guid = event[1][0]
-                function = event[1][1]
-                args = event[1][2]
-                if int(expiration) < block:
-                    await function(**args)
+                expiration = event.priority
+                if expiration < block:
+                    await event.execute()
                     event = await self.pop()
                 else:
                     # Throw it back on the front
-                    await self.schedule(expiration, guid, function, args)
+                    await self.schedule(event)
                     break
         self.lock.release()
+
+@total_ordering
+class SchedulerTask:
+    def __init__(self, priority, function, args):
+        self.priority = priority
+        self.function = function
+        self.args = args
+
+    def __eq__(self, other):
+        return self.priority == other.priority
+
+    def __lt__(self, other):
+        return self.priority < other.priority
+
+    async def execute(self):
+        await self.function(**self.args)

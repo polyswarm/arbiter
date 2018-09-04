@@ -5,6 +5,7 @@ import time
 import json
 from eth_abi import decode_single
 from arbiter.scheduler import SchedulerQueue
+from arbiter.scheduler import SchedulerTask
 
 from uuid import UUID
 import requests
@@ -252,8 +253,8 @@ async def listen_and_arbitrate(isTest, backend):
 
                         verdicts.append(await backend.scan(file))
 
-                    vote = lambda session, isTest, guid, verdicts: post_vote(session, isTest, guid, verdicts)
-                    settle = lambda session, isTest, guid: post_settle(session, isTest, guid)
+                    vote_task = SchedulerTask(int(bounty["expiration"])+reveal_window, post_vote, {"session": session, "isTest": isTest, "guid": bounty["guid"], "verdicts": verdicts})
+                    settle_task = SchedulerTask(int(bounty["expiration"])+reveal_window+voting_window, post_settle, {"session": session, "isTest": isTest, "guid": bounty["guid"]})
 
-                    await scheduler.schedule(int(bounty["expiration"])+reveal_window, bounty["guid"], vote, {"session": session, "isTest": isTest, "guid": bounty["guid"], "verdicts": verdicts})
-                    await scheduler.schedule(int(bounty["expiration"])+reveal_window+voting_window, bounty["guid"], settle, {"session": session, "isTest": isTest, "guid": bounty["guid"]})
+                    await scheduler.schedule(vote_task)
+                    await scheduler.schedule(settle_task)
