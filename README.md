@@ -27,6 +27,28 @@ All backends must be their own python module inside the `backends/` directory. T
 
 At a minimum, it must have a `scan(host, uri)` function that returns an array of boolean verdicts.
 
+## Generate verbatim database
+
+The verbatim scanner uses a database called `truth.db`
+The arbiter projects includes a helper to generate that database.
+Run the command with `generate_verbatim`.
+By default that will load benign files from `artifacts/benign` and malicious files from `artifacts/malicious`.
+The output database is `artifacts/truth.db`.
+
+```bash
+$ generate_verbatim --help
+Usage: generate_verbatim [OPTIONS]
+
+Options:
+  --malicious PATH  Input directory of malicious files
+  --benign PATH     Input directory of benign files
+  --output PATH     Output database file.
+  --help            Show this message and exit.
+```
+
+The created database is a single table called `files`.
+The table has two columns, `(name text, truth int)`.
+
 ## Error codes
 
 There are three major events that cause errors
