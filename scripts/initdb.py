@@ -9,18 +9,19 @@ def init():
     benign = os.listdir(os.path.join(os.getcwd(), 'artifacts', 'benign'))
     for b in benign:
         insert(cursor, os.path.join(os.getcwd(), 'artifacts', 'benign', b), 0)
+        conn.commit()
 
     malicious = os.listdir(os.path.join(os.getcwd(), 'artifacts', 'malicious'))
     for m in malicious:
         insert(cursor, os.path.join(os.getcwd(), 'artifacts', 'malicious', m), 1)
+        conn.commit()
 
-    conn.commit()
     conn.close()
 
 def insert(cursor, path, result):
-    with open (path, encoding='utf-8') as f:
+    with open (path, "rb") as f:
         data = f.read()
-        h = hashlib.sha256(data.encode('utf-8')).hexdigest()
+        h = hashlib.sha256(data).hexdigest()
         value = (h, result)
         cursor.execute('''INSERT INTO files values (?, ?)''', value)
 
