@@ -16,12 +16,15 @@ setup(
     license='MIT',
     install_requires=parse_requirements(),
     include_package_data=True,
-    packages=['arbiter', 'backends'],
+    packages=['arbiter', 'backends', 'db'],
     package_dir={
         'arbiter': 'src/arbiter',
         'backends': 'src/backends',
+        'db': 'src/db'
     },
     entry_points={
-        'console_scripts': ['arbiter=arbiter.__main__:main'],
+        'console_scripts': [
+                'arbiter=arbiter.__main__:main', 'generate_verbatim=db.__main__:main'
+            ],
     },
 )
