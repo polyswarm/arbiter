@@ -1,12 +1,19 @@
 import sqlite3
 import hashlib
+import os
 
 def init():
     conn = sqlite3.connect('../artifacts/truth.db')
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS files (name text, truth int)''')
-    insert(cursor, './artifacts/benign', 0)
-    insert(cursor, './artifacts/malicious', 1)
+    benign = os.listdir(os.path.join(os.getcwd(), 'artifacts', 'benign'))
+    for b in benign:
+        insert(cursor, os.path.join(os.getcwd(), 'artifacts', 'benign', b), 0)
+
+    malicious = os.listdir(os.path.join(os.getcwd(), 'artifacts', 'malicious'))
+    for m in malicious:
+        insert(cursor, os.path.join(os.getcwd(), 'artifacts', 'malicious', m), 1)
+
     conn.commit()
     conn.close()
 
