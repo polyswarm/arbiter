@@ -218,6 +218,7 @@ async def listen_and_arbitrate(isTest, backend):
         print_error(True, "Invalid address %s" % address, 7)
 
     scheduler = SchedulerQueue()
+    scanner = backend.Scanner()
     headers = {'Authorization': api_key} if api_key else {}
     async with aiohttp.ClientSession(headers=headers) as session:
         if not await post_stake(session):
@@ -251,7 +252,7 @@ async def listen_and_arbitrate(isTest, backend):
                             verdict.append(False)
                             continue
 
-                        verdicts.append(await backend.scan(file))
+                        verdicts.append(await scanner.scan(file))
 
                     vote_task = SchedulerTask(int(bounty["expiration"])+reveal_window, post_vote, {"session": session, "isTest": isTest, "guid": bounty["guid"], "verdicts": verdicts})
                     settle_task = SchedulerTask(int(bounty["expiration"])+reveal_window+voting_window, post_settle, {"session": session, "isTest": isTest, "guid": bounty["guid"]})
