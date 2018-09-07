@@ -307,28 +307,45 @@ async def listen_and_arbitrate(isTest, backend):
                     if number % 100 == 0:
                         logging.info('Block %s', number)
 
-                    await scheduler.execute_scheduled(number)
+                    asyncio.get_event_loop().create_task(scheduler.execute_scheduled(number))
                 elif message["event"] == "bounty":
                     bounty = message["data"]
-                    logging.info('Received bounty: %s', bounty)
-                    if not check_uuid(bounty["guid"]):
-                        fatal_error(isTest, "Bad GUID: %s" % bounty["guid"], 10)
-                        continue
+                    asyncio.get_event_loop().create_task(handle_bounty(isTest, session, scheduler, reveal_window, voting_window, scanner, bounty))
 
-                    verdicts = []
-                    artifacts = await get_artifacts(session, isTest, bounty["uri"])
-                    for i, f in enumerate(artifacts):
-                        file = await get_artifact_contents(session, isTest, bounty["uri"], i)
-                        if file is None:
-                            fatal_error(isTest, "Failed to retrieve files from IPFS.", 12)
-                            # If not exiting, just send zero
-                            verdict.append(False)
-                            continue
+async def handle_bounty(isTest, session, scheduler, reveal_window, voting_window, scanner, bounty):
+    logging.info('Received bounty: %s', bounty)
+    if not check_uuid(bounty["guid"]):
+        fail_test(isTest, "Bad GUID: %s" % bounty["guid"], 10)
+        return
 
-                        verdicts.append(await scanner.scan(file))
+    verdicts = []
+    artifacts = await get_artifacts(session, isTest, bounty["uri"])
+    for i, f in enumerate(artifacts):
+        file = await get_artifact_contents(session, isTest, bounty["uri"], i)
+        if file is None:
+            fail_test(isTest, "Failed to retrieve files from IPFS.", 12)
+            # If not exiting, just send zero
+            verdict.append(False)
+            return
 
-                    vote_task = SchedulerTask(int(bounty["expiration"])+reveal_window, post_vote, {"session": session, "isTest": isTest, "guid": bounty["guid"], "verdicts": verdicts})
-                    settle_task = SchedulerTask(int(bounty["expiration"])+reveal_window+voting_window, post_settle, {"session": session, "isTest": isTest, "guid": bounty["guid"]})
+        verdicts.append(await scanner.scan(file))
 
-                    await scheduler.schedule(vote_task)
-                    await scheduler.schedule(settle_task)
+# Create vote task
+    vote_args = {
+        "priority": int(bounty["expiration"])+reveal_window,
+        "function": post_vote,
+        "args": {"session": session, "isTest": isTest, "guid": bounty["guid"], "verdicts": verdicts}
+    }
+
+    vote_task = SchedulerTask(**vote_args)
+    await scheduler.schedule(vote_task)
+
+    # Create settle task
+    settle_args = {
+        "priority": int(bounty["expiration"])+reveal_window+voting_window,
+        "function": post_settle,
+        "args": {"session": session, "isTest": isTest, "guid": bounty["guid"]}
+    }
+
+    settle_task = SchedulerTask(**settle_args)
+    await scheduler.schedule(settle_task)
