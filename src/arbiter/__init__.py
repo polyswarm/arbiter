@@ -137,8 +137,8 @@ async def post_settle(session, isTest, guid):
 
         base_nonce += len(transactions)
 
-    logging.info('Firing off settle transactions: %s', transactions)
-    asyncio.ensure_future(post_transactions(session, {}, transactions))
+    logging.info('Firing off settle transactions: %s %s', guid, transactions)
+    asyncio.ensure_future(post_transactions(session, guid, {}, transactions))
     return True
 
 async def post_stake(session):
@@ -176,12 +176,12 @@ async def post_stake(session):
             base_nonce += len(transactions)
 
     logging.info('Awaiting stake transactions: %s', transactions)
-    return await post_transactions(session, data, transactions)
+    return await post_transactions(session, '', data, transactions)
 
 # This can be awaited on for initialization transactions (e.g. staking), but
 # should be called asynchronously with e.g. asyncio.ensure_future once we enter
 # the main event loop
-async def post_transactions(session, data, transactions):
+async def post_transactions(session, guid, data, transactions):
     url = "{0}/transactions".format(base_url)
     signed_transactions = []
     key = decrypt_key(address, password)
@@ -194,15 +194,15 @@ async def post_transactions(session, data, transactions):
         transaction_response = await response.json()
 
     if not check_response(transaction_response):
-        fatal_error(False, 'Invalid transaction response', 1)
+        fatal_error(True, 'Invalid transaction response', 1)
         return False
 
     if "errors" in transaction_response["result"]:
-        logging.error('Transaction failed: %s, %s', data, transaction_response)
-        fatal_error(False, "Failed to send transactions.", 13)
+        logging.error('Transaction failed: %s %s, %s', guid, data, transaction_response)
+        fatal_error(True, "Failed to send transactions.", 13)
         return False
 
-    logging.info('Received transaction events: %s', transaction_response)
+    logging.info('Received transaction events: %s %s', guid, transaction_response)
     return True
 
 async def post_vote(session, isTest, guid, verdicts):
@@ -225,8 +225,8 @@ async def post_vote(session, isTest, guid, verdicts):
 
             base_nonce += len(transactions)
 
-    logging.info('Firing off vote transactions: %s', transactions)
-    asyncio.ensure_future(post_transactions(session, data, transactions))
+    logging.info('Firing off vote transactions: %s %s', guid, transactions)
+    asyncio.ensure_future(post_transactions(session, guid, data, transactions))
     return True
 
 def fatal_error(test, message, code):
