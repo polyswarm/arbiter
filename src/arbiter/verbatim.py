@@ -11,7 +11,7 @@ class VerbatimArbiter(Arbiter):
 
     async def scan(self, guid, content):
         h = hashlib.sha256(content).hexdigest()
-        return self.find_truth(h)
+        return True, self.find_truth(h), ''
 
     # Finds the file in the truth table. Returns a boolean or None.
     def find_truth(self, filehash):
