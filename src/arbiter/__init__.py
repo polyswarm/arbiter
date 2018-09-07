@@ -138,7 +138,7 @@ async def post_settle(session, isTest, guid):
         base_nonce += len(transactions)
 
     logging.info('Firing off settle transactions: %s %s', guid, transactions)
-    asyncio.ensure_future(post_transactions(session, guid, {}, transactions))
+    asyncio.ensure_future(post_transactions(session, guid, {}, transactions, exit_on_success=isTest))
     return True
 
 async def post_stake(session):
@@ -181,7 +181,7 @@ async def post_stake(session):
 # This can be awaited on for initialization transactions (e.g. staking), but
 # should be called asynchronously with e.g. asyncio.ensure_future once we enter
 # the main event loop
-async def post_transactions(session, guid, data, transactions):
+async def post_transactions(session, guid, data, transactions, exit_on_success=False):
     url = "{0}/transactions".format(base_url)
     signed_transactions = []
     key = decrypt_key(address, password)
@@ -201,6 +201,9 @@ async def post_transactions(session, guid, data, transactions):
         logging.error('Transaction failed: %s %s, %s', guid, data, transaction_response)
         fatal_error(True, "Failed to send transactions.", 13)
         return False
+
+    if exit_on_success:
+        test_success()
 
     logging.info('Received transaction events: %s %s', guid, transaction_response)
     return True
@@ -235,6 +238,11 @@ def fatal_error(test, message, code):
         sys.exit(code)
     else:
         logging.error('Failure detected: %s, code: %s', message, code)
+
+def test_success():
+    logging.info("Test successful: Settle a bounty.")
+    loop = asyncio.get_event_loop()
+    loop.stop()
 
 def verify_vote(guid, verdicts, transactions):
     (vote_guid, vote_verdicts, validBloom) = decode_single("(uint256,uint256,bool)", w3.toBytes(hexstr=transactions[0]["data"][10:]))

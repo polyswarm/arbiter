@@ -13,7 +13,9 @@ def main():
     args = parser.parse_args()
 
     backend = importlib.import_module("backends.{0}".format(args.backend))
-    asyncio.get_event_loop().run_until_complete(listen_and_arbitrate(args.test, backend))
+    loop = asyncio.get_event_loop()
+    loop.create_task(listen_and_arbitrate(args.test, backend))
+    loop.run_forever()
 
 if __name__ == "__main__":
     main()
