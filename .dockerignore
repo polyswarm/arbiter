@@ -1,7 +1,6 @@
 *.swp
-data/
-staging
-priv_testnet/
-*.xz
-artifacts/benign
-artifacts/malicious
+*.pyc
+.tox/
+venv/
+__pycache__/
+.idea

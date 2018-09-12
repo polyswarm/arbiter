@@ -1,11 +1,6 @@
 *.swp
-*.tar.xz
-data/
-staging
-priv_testnet/
-arbiter-verbatim
+*.pyc
+.tox/
+venv/
 __pycache__/
-build/
-dist/
-*.egg-info
-.vscode/
+.idea
