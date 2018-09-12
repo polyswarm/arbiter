@@ -9,7 +9,7 @@ class VerbatimArbiter(Arbiter):
         super().__init__(polyswarmd_addr, keyfile, password, api_key, testing, insecure_transport)
         self.conn = sqlite3.connect(os.path.join(os.getcwd(), "artifacts", "truth.db"))
 
-    async def scan(self, guid, content):
+    async def scan(self, guid, content, chain):
         h = hashlib.sha256(content).hexdigest()
         return True, self.find_truth(h), ''
 
