@@ -46,7 +46,7 @@ def choose_backend(backend):
         help='API key to use with polyswarmd')
 @click.option('--backend', envvar='BACKEND', default='scratch',
         help='Backend to use')
-@click.option('--testing', default=-1,
+@click.option('--testing', default=0,
         help='Activate testing mode for integration testing, respond to N bounties then exit')
 @click.option('--insecure-transport', is_flag=True,
         help='Connect to polyswarmd via http:// and ws://, mutially exclusive with --api-key')

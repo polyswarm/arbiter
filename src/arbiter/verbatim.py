@@ -5,7 +5,7 @@ import os
 from polyswarmclient.arbiter import Arbiter
 
 class VerbatimArbiter(Arbiter):
-    def __init__(self, polyswarmd_addr, keyfile, password, api_key=None, testing=False, insecure_transport=False):
+    def __init__(self, polyswarmd_addr, keyfile, password, api_key=None, testing=0, insecure_transport=False):
         super().__init__(polyswarmd_addr, keyfile, password, api_key, testing, insecure_transport)
         self.conn = sqlite3.connect(os.path.join(os.getcwd(), "artifacts", "truth.db"))
 
