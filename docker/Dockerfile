@@ -20,5 +20,5 @@ RUN set -x && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 RUN set -x && pip install .
-
+RUN generate_verbatim --malicious ./artifacts/malicious --benign ./artifacts/benign --output ./artifacts/truth.db
 CMD ["arbiter"]
